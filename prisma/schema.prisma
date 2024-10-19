@@ -1,0 +1,165 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// schema.prisma
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  firstName     String
+  lastName      String
+  email         String         @unique
+  passwordHash  String
+  avatar        String?
+  phoneNumber   String?
+  role          String         @default("USER") // Enforce roles at API level
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  codeTemplates CodeTemplate[] // One-to-many with CodeTemplate
+  blogPosts     BlogPost[]     // One-to-many with BlogPost
+  comments      Comment[]      // One-to-many with Comment
+  ratings       Rating[]       // One-to-many with Rating
+  reports       Report[]       // One-to-many with Report (reports submitted by the user)
+
+  // Additional indices
+  @@index([email])
+}
+
+model CodeTemplate {
+  id          Int             @id @default(autoincrement())
+  title       String
+  code        String
+  language    String
+  explanation String?
+  isFork      Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Author relation
+  authorId    Int
+  author      User            @relation(fields: [authorId], references: [id])
+
+  // Self-referential relation for forks
+  parentId    Int?
+  parent      CodeTemplate?   @relation("TemplateForks", fields: [parentId], references: [id])
+  forks       CodeTemplate[]  @relation("TemplateForks")
+
+  // Many-to-many relation with Tag
+  tags        Tag[]           @relation("TemplateTags")
+
+  // Many-to-many relation with BlogPost
+  blogPosts   BlogPost[]      @relation("PostTemplates")
+}
+
+model Tag {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+
+  // Relations
+  codeTemplates CodeTemplate[]  @relation("TemplateTags")
+  blogPosts     BlogPost[]      @relation("PostTags")
+}
+
+model BlogPost {
+  id          Int             @id @default(autoincrement())
+  title       String
+  description String?
+  content     String
+  status      String          @default("PUBLISHED") // Enforce content status at API level
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Author relation
+  authorId    Int
+  author      User            @relation(fields: [authorId], references: [id])
+
+  // Many-to-many relation with CodeTemplate
+  templates   CodeTemplate[]  @relation("PostTemplates")
+
+  // Many-to-many relation with Tag
+  tags        Tag[]           @relation("PostTags")
+
+  // Relations
+  comments    Comment[]       // One-to-many with Comment
+  ratings     Rating[]        // One-to-many with Rating
+  reports     Report[]        // One-to-many with Report
+}
+
+model Comment {
+  id          Int             @id @default(autoincrement())
+  content     String
+  status      String          @default("PUBLISHED") // Enforce content status at API level
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Author relation
+  authorId    Int
+  author      User            @relation(fields: [authorId], references: [id])
+
+  // Relations
+  blogPostId  Int?
+  blogPost    BlogPost?       @relation(fields: [blogPostId], references: [id])
+
+  // Self-referential relation for replies
+  parentId    Int?
+  parent      Comment?        @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     Comment[]       @relation("CommentReplies")
+
+  ratings     Rating[]        // One-to-many with Rating
+  reports     Report[]        // One-to-many with Report
+}
+
+model Rating {
+  id          Int             @id @default(autoincrement())
+  value       Int             // +1 for upvote, -1 for downvote
+  createdAt   DateTime        @default(now())
+
+  // User relation
+  userId      Int
+  user        User            @relation(fields: [userId], references: [id])
+
+  // Relations (either blogPost or comment)
+  blogPostId  Int?
+  blogPost    BlogPost?       @relation(fields: [blogPostId], references: [id])
+
+  commentId   Int?
+  comment     Comment?        @relation(fields: [commentId], references: [id])
+
+  // Constraints to ensure a user can rate a post or comment only once
+  @@unique([userId, blogPostId], name: "uniqueUserPostRating")
+  @@unique([userId, commentId], name: "uniqueUserCommentRating")
+}
+
+model Report {
+  id             Int             @id @default(autoincrement())
+  reason         String
+  additionalInfo String?
+  createdAt      DateTime        @default(now())
+
+  // User who submitted the report
+  reportedById   Int
+  reportedBy     User            @relation(fields: [reportedById], references: [id])
+
+  // Relations (either blogPost or comment)
+  blogPostId     Int?
+  blogPost       BlogPost?       @relation(fields: [blogPostId], references: [id])
+
+  commentId      Int?
+  comment        Comment?        @relation(fields: [commentId], references: [id])
+
+  // Note: Enforce at the application level that either blogPostId or commentId is set
+}
+
