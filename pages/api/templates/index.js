@@ -13,6 +13,8 @@ const createTemplateSchema = Yup.object().shape({
 async function handler(req, res) {
   if (req.method === 'POST') {
     // Create a new code template
+    // only authenticated users can create templates
+    return authenticateToken(async (req, res) => {
     try {
       const validatedData = await createTemplateSchema.validate(req.body, { abortEarly: false });
       const { title, code, language, explanation, tags } = validatedData;
@@ -44,6 +46,7 @@ async function handler(req, res) {
       }
       res.status(500).json({ error: 'Internal server error' });
     }
+    })(req, res);
   } else if (req.method === 'GET') {
     
     // Extract searching filters
@@ -104,4 +107,4 @@ async function handler(req, res) {
   }
 }
 
-export default authenticateToken(handler);
+export default handler;
