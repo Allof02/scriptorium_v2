@@ -32,7 +32,9 @@ async function handler(req, res) {
           language,
           explanation,
           author: { connect: { id: req.user.id } },
+          authorId: req.user.id,
           tags: { connectOrCreate: tagConnectOrCreate },
+          isFork: false,
         },
         include: {
           tags: true,
